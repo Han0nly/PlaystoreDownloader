@@ -305,19 +305,22 @@ class Playstore(object):
         path = "delivery"
         if download_versions:
             for i in range(0,version_code):
+                if i > 50000:
+                    break
                 if not file_name:
                     file_name = f"{package_name}_{str(version_code)}).apk"
                 query = {"ot": offer_type, "doc": package_name, "vc": i}
                 response = self._execute_request(path, query)
-                _handle_missing_payload(response, package_name)
+                if "payload" not in self.protobuf_to_dict(response):
+                    continue
                 delivery_data = response.payload.deliveryResponse.appDeliveryData
-
                 if not delivery_data.downloadUrl:
                     # The app doesn't belong to the account, so it has to be added to the
                     # account first.
                     path = "purchase"
                     response = self._execute_request(path, data=query)
-                    _handle_missing_payload(response, package_name)
+                    if "payload" not in self.protobuf_to_dict(response):
+                        continue
                     delivery_data = (
                         response.payload.buyResponse.purchaseStatusResponse.appDeliveryData
                     )
@@ -327,7 +330,8 @@ class Playstore(object):
                         path = "delivery"
                         query["dtok"] = download_token
                         response = self._execute_request(path, query)
-                        _handle_missing_payload(response, package_name)
+                        if "payload" not in self.protobuf_to_dict(response):
+                            continue
                         delivery_data = response.payload.deliveryResponse.appDeliveryData
 
                 # The url where to download the apk file.
