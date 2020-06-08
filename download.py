@@ -40,6 +40,11 @@ def get_cmd_args(args: list = None):
         'e.g., "com.spotify.music" or "com.whatsapp"',
     )
     parser.add_argument(
+        "-v",
+        type=int,
+        help="Download different versions apps",
+    )
+    parser.add_argument(
         "-b",
         "--blobs",
         action="store_true",
@@ -95,6 +100,7 @@ def main():
         try:
             # Get the application details.
             app = api.app_details(stripped_package_name).docV2
+            # version_code = app.docV2.details.appDetails.versionCode
         except AttributeError:
             logger.critical(
                 f"Error when downloading '{stripped_package_name}': unable to "
@@ -106,6 +112,7 @@ def main():
             "package_name": app.docid,
             "title": app.title,
             "creator": app.creator,
+            "versioncode": app.docV2.details.appDetails.versionCode,
         }
 
         if args.out.strip(" '\"") == downloaded_apk_default_location:

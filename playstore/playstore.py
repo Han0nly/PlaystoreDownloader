@@ -243,6 +243,7 @@ class Playstore(object):
         package_name: str,
         file_name: str = None,
         download_obb: bool = False,
+        download_versions: bool = False,
         download_split_apks: bool = False,
         show_progress_bar: bool = False,
     ) -> Iterable[int]:
@@ -285,10 +286,6 @@ class Playstore(object):
                     "information"
                 )
 
-        # Set the default file name if none is provided.
-        if not file_name:
-            file_name = f"{package_name}.apk"
-
         # Get the app details before downloading it.
         details = self.app_details(package_name)
 
@@ -301,133 +298,255 @@ class Playstore(object):
                 "Can't proceed with the download: there was an error when "
                 f"requesting details for app '{package_name}'"
             )
-
+        # Maximum version_code
         version_code = details.docV2.details.appDetails.versionCode
         offer_type = details.docV2.offer[0].offerType
-
         # Check if the app was already downloaded by this account.
         path = "delivery"
-        query = {"ot": offer_type, "doc": package_name, "vc": version_code}
-
-        response = self._execute_request(path, query)
-        _handle_missing_payload(response, package_name)
-        delivery_data = response.payload.deliveryResponse.appDeliveryData
-
-        if not delivery_data.downloadUrl:
-            # The app doesn't belong to the account, so it has to be added to the
-            # account first.
-            path = "purchase"
-
-            response = self._execute_request(path, data=query)
-            _handle_missing_payload(response, package_name)
-            delivery_data = (
-                response.payload.buyResponse.purchaseStatusResponse.appDeliveryData
-            )
-            download_token = response.payload.buyResponse.downloadToken
-
-            if not self.protobuf_to_dict(delivery_data) and download_token:
-                path = "delivery"
-                query["dtok"] = download_token
+        if download_versions:
+            for i in range(0,version_code):
+                if not file_name:
+                    file_name = f"{package_name}_{str(version_code)}).apk"
+                query = {"ot": offer_type, "doc": package_name, "vc": i}
                 response = self._execute_request(path, query)
                 _handle_missing_payload(response, package_name)
                 delivery_data = response.payload.deliveryResponse.appDeliveryData
 
-        # The url where to download the apk file.
-        temp_url = delivery_data.downloadUrl
+                if not delivery_data.downloadUrl:
+                    # The app doesn't belong to the account, so it has to be added to the
+                    # account first.
+                    path = "purchase"
+                    response = self._execute_request(path, data=query)
+                    _handle_missing_payload(response, package_name)
+                    delivery_data = (
+                        response.payload.buyResponse.purchaseStatusResponse.appDeliveryData
+                    )
+                    download_token = response.payload.buyResponse.downloadToken
 
-        # Additional files (.obb) to be downloaded with the application.
-        # https://developer.android.com/google/play/expansion-files
-        additional_files = [
-            additional_file for additional_file in delivery_data.additionalFile
-        ]
+                    if not self.protobuf_to_dict(delivery_data) and download_token:
+                        path = "delivery"
+                        query["dtok"] = download_token
+                        response = self._execute_request(path, query)
+                        _handle_missing_payload(response, package_name)
+                        delivery_data = response.payload.deliveryResponse.appDeliveryData
 
-        # Additional split apk(s) to be downloaded with the application.
-        # https://developer.android.com/guide/app-bundle/dynamic-delivery
-        split_apks = [split_apk for split_apk in delivery_data.split]
+                # The url where to download the apk file.
+                temp_url = delivery_data.downloadUrl
 
-        try:
-            cookie = delivery_data.downloadAuthCookie[0]
-        except IndexError:
-            self.logger.error(
-                f"DownloadAuthCookie was not received for '{package_name}'"
-            )
-            raise RuntimeError(
-                f"DownloadAuthCookie was not received for '{package_name}'"
-            )
+                # Additional files (.obb) to be downloaded with the application.
+                # https://developer.android.com/google/play/expansion-files
+                additional_files = [
+                    additional_file for additional_file in delivery_data.additionalFile
+                ]
 
-        cookies = {str(cookie.name): str(cookie.value)}
+                # Additional split apk(s) to be downloaded with the application.
+                # https://developer.android.com/guide/app-bundle/dynamic-delivery
+                split_apks = [split_apk for split_apk in delivery_data.split]
 
-        headers = {
-            "User-Agent": "AndroidDownloadManager/8.0.0 (Linux; U; Android 8.0.0; "
-            "STF-L09 Build/HUAWEISTF-L09)",
-            "Accept-Encoding": "",
-        }
+                try:
+                    cookie = delivery_data.downloadAuthCookie[0]
+                except IndexError:
+                    self.logger.error(
+                        f"DownloadAuthCookie was not received for '{package_name}'"
+                    )
+                    raise RuntimeError(
+                        f"DownloadAuthCookie was not received for '{package_name}'"
+                    )
 
-        # Execute another request to get the actual apk file.
-        response = requests.get(
-            temp_url, headers=headers, cookies=cookies, verify=True, stream=True
-        )
+                cookies = {str(cookie.name): str(cookie.value)}
 
-        yield from self._download_single_file(
-            file_name,
-            response,
-            show_progress_bar,
-            f"Downloading {package_name}",
-            "Unable to download the entire application",
-        )
+                headers = {
+                    "User-Agent": "AndroidDownloadManager/8.0.0 (Linux; U; Android 8.0.0; "
+                                  "STF-L09 Build/HUAWEISTF-L09)",
+                    "Accept-Encoding": "",
+                }
 
-        if download_obb:
-            # Save the additional .obb files for this application.
-            for obb in additional_files:
-
-                # Execute another query to get the actual file.
+                # Execute another request to get the actual apk file.
                 response = requests.get(
-                    obb.downloadUrl,
-                    headers=headers,
-                    cookies=cookies,
-                    verify=True,
-                    stream=True,
-                )
-
-                obb_file_name = os.path.join(
-                    os.path.dirname(file_name),
-                    f"{'main' if obb.fileType == 0 else 'patch'}."
-                    f"{obb.versionCode}.{package_name}.obb",
+                    temp_url, headers=headers, cookies=cookies, verify=True, stream=True
                 )
 
                 yield from self._download_single_file(
-                    obb_file_name,
+                    file_name,
                     response,
                     show_progress_bar,
-                    f"Downloading additional .obb file for {package_name}",
-                    "Unable to download completely the additional .obb file(s)",
+                    f"Downloading {package_name}",
+                    "Unable to download the entire application",
                 )
 
-        if download_split_apks:
-            # Save the split apk(s) for this application.
-            for split_apk in split_apks:
+                if download_obb:
+                    # Save the additional .obb files for this application.
+                    for obb in additional_files:
+                        # Execute another query to get the actual file.
+                        response = requests.get(
+                            obb.downloadUrl,
+                            headers=headers,
+                            cookies=cookies,
+                            verify=True,
+                            stream=True,
+                        )
 
-                # Execute another query to get the actual file.
-                response = requests.get(
-                    split_apk.downloadUrl,
-                    headers=headers,
-                    cookies=cookies,
-                    verify=True,
-                    stream=True,
+                        obb_file_name = os.path.join(
+                            os.path.dirname(file_name),
+                            f"{'main' if obb.fileType == 0 else 'patch'}."
+                            f"{obb.versionCode}.{package_name}.obb",
+                        )
+
+                        yield from self._download_single_file(
+                            obb_file_name,
+                            response,
+                            show_progress_bar,
+                            f"Downloading additional .obb file for {package_name}",
+                            "Unable to download completely the additional .obb file(s)",
+                        )
+
+                if download_split_apks:
+                    # Save the split apk(s) for this application.
+                    for split_apk in split_apks:
+                        # Execute another query to get the actual file.
+                        response = requests.get(
+                            split_apk.downloadUrl,
+                            headers=headers,
+                            cookies=cookies,
+                            verify=True,
+                            stream=True,
+                        )
+
+                        split_apk_file_name = os.path.join(
+                            os.path.dirname(file_name),
+                            f"{split_apk.name}.{version_code}.{package_name}.apk",
+                        )
+
+                        yield from self._download_single_file(
+                            split_apk_file_name,
+                            response,
+                            show_progress_bar,
+                            f"Downloading split apk for {package_name}",
+                            "Unable to download completely the additional split apk file(s)",
+                        )
+        else:
+            if not file_name:
+                file_name = f"{package_name}_{str(version_code)}).apk"
+            query = {"ot": offer_type, "doc": package_name, "vc": version_code}
+            response = self._execute_request(path, query)
+            _handle_missing_payload(response, package_name)
+            delivery_data = response.payload.deliveryResponse.appDeliveryData
+
+            if not delivery_data.downloadUrl:
+                # The app doesn't belong to the account, so it has to be added to the
+                # account first.
+                path = "purchase"
+
+                response = self._execute_request(path, data=query)
+                _handle_missing_payload(response, package_name)
+                delivery_data = (
+                    response.payload.buyResponse.purchaseStatusResponse.appDeliveryData
+                )
+                download_token = response.payload.buyResponse.downloadToken
+
+                if not self.protobuf_to_dict(delivery_data) and download_token:
+                    path = "delivery"
+                    query["dtok"] = download_token
+                    response = self._execute_request(path, query)
+                    _handle_missing_payload(response, package_name)
+                    delivery_data = response.payload.deliveryResponse.appDeliveryData
+
+            # The url where to download the apk file.
+            temp_url = delivery_data.downloadUrl
+
+            # Additional files (.obb) to be downloaded with the application.
+            # https://developer.android.com/google/play/expansion-files
+            additional_files = [
+                additional_file for additional_file in delivery_data.additionalFile
+            ]
+
+            # Additional split apk(s) to be downloaded with the application.
+            # https://developer.android.com/guide/app-bundle/dynamic-delivery
+            split_apks = [split_apk for split_apk in delivery_data.split]
+
+            try:
+                cookie = delivery_data.downloadAuthCookie[0]
+            except IndexError:
+                self.logger.error(
+                    f"DownloadAuthCookie was not received for '{package_name}'"
+                )
+                raise RuntimeError(
+                    f"DownloadAuthCookie was not received for '{package_name}'"
                 )
 
-                split_apk_file_name = os.path.join(
-                    os.path.dirname(file_name),
-                    f"{split_apk.name}.{version_code}.{package_name}.apk",
-                )
+            cookies = {str(cookie.name): str(cookie.value)}
 
-                yield from self._download_single_file(
-                    split_apk_file_name,
-                    response,
-                    show_progress_bar,
-                    f"Downloading split apk for {package_name}",
-                    "Unable to download completely the additional split apk file(s)",
-                )
+            headers = {
+                "User-Agent": "AndroidDownloadManager/8.0.0 (Linux; U; Android 8.0.0; "
+                "STF-L09 Build/HUAWEISTF-L09)",
+                "Accept-Encoding": "",
+            }
+
+            # Execute another request to get the actual apk file.
+            response = requests.get(
+                temp_url, headers=headers, cookies=cookies, verify=True, stream=True
+            )
+
+            yield from self._download_single_file(
+                file_name,
+                response,
+                show_progress_bar,
+                f"Downloading {package_name}",
+                "Unable to download the entire application",
+            )
+
+            if download_obb:
+                # Save the additional .obb files for this application.
+                for obb in additional_files:
+
+                    # Execute another query to get the actual file.
+                    response = requests.get(
+                        obb.downloadUrl,
+                        headers=headers,
+                        cookies=cookies,
+                        verify=True,
+                        stream=True,
+                    )
+
+                    obb_file_name = os.path.join(
+                        os.path.dirname(file_name),
+                        f"{'main' if obb.fileType == 0 else 'patch'}."
+                        f"{obb.versionCode}.{package_name}.obb",
+                    )
+
+                    yield from self._download_single_file(
+                        obb_file_name,
+                        response,
+                        show_progress_bar,
+                        f"Downloading additional .obb file for {package_name}",
+                        "Unable to download completely the additional .obb file(s)",
+                    )
+
+            if download_split_apks:
+                # Save the split apk(s) for this application.
+                for split_apk in split_apks:
+
+                    # Execute another query to get the actual file.
+                    response = requests.get(
+                        split_apk.downloadUrl,
+                        headers=headers,
+                        cookies=cookies,
+                        verify=True,
+                        stream=True,
+                    )
+
+                    split_apk_file_name = os.path.join(
+                        os.path.dirname(file_name),
+                        f"{split_apk.name}.{version_code}.{package_name}.apk",
+                    )
+
+                    yield from self._download_single_file(
+                        split_apk_file_name,
+                        response,
+                        show_progress_bar,
+                        f"Downloading split apk for {package_name}",
+                        "Unable to download completely the additional split apk file(s)",
+                    )
 
     ############################
     # Playstore Public Methods #
@@ -660,6 +779,7 @@ class Playstore(object):
         package_name: str,
         file_name: str = None,
         download_obb: bool = False,
+        download_versions: bool = False,
         download_split_apks: bool = False,
         show_progress_bar: bool = True,
     ) -> bool:
@@ -686,6 +806,7 @@ class Playstore(object):
                     package_name,
                     file_name,
                     download_obb,
+                    download_versions,
                     download_split_apks,
                     show_progress_bar,
                 )
