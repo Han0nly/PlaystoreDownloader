@@ -253,6 +253,7 @@ class Playstore(object):
         the Google Play Store and report the progress (using a generator that reports
         the download progress in the range 0-100).
 
+        :type download_versions: Flag indicating whether to also download different versions apps
         :param package_name: The package name of the app (e.g., "com.example.myapp").
         :param file_name: The location where to save the downloaded app (by default
                           "package_name.apk").
@@ -304,13 +305,21 @@ class Playstore(object):
         offer_type = details.docV2.offer[0].offerType
         # Check if the app was already downloaded by this account.
         path = "delivery"
+        self.logger.error(
+            f"最新版本为 '{version_code}'"
+        )
         if download_versions:
-            for i in range(0,version_code):
+            for i in range(0,version_code+1):
+                self.logger.error(
+                    f"正在下载'{package_name}_{i}'"
+                )
                 time.sleep(1)
                 if i > 50000:
                     break
                 if not file_name:
-                    file_name = f"{package_name}_{str(version_code)}).apk"
+                    file_name = f"{package_name}_{str(version_code)}.apk"
+                else:
+                    file_name = file_name[:-4]+f"_{str(version_code)}.apk"
                 query = {"ot": offer_type, "doc": package_name, "vc": i}
                 response = self._execute_request(path, query)
                 if "payload" not in self.protobuf_to_dict(response):
@@ -355,9 +364,7 @@ class Playstore(object):
                     self.logger.error(
                         f"DownloadAuthCookie was not received for '{package_name}'"
                     )
-                    raise RuntimeError(
-                        f"DownloadAuthCookie was not received for '{package_name}'"
-                    )
+                    continue
 
                 cookies = {str(cookie.name): str(cookie.value)}
 
@@ -793,6 +800,7 @@ class Playstore(object):
         Download a certain app (identified by the package name) from the
         Google Play Store.
 
+        :param download_versions: Flag indicating whether to also download all different versions apks
         :param package_name: The package name of the app (e.g., "com.example.myapp").
         :param file_name: The location where to save the downloaded app (by default
                           "package_name.apk").

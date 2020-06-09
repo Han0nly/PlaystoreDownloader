@@ -41,7 +41,8 @@ def get_cmd_args(args: list = None):
     )
     parser.add_argument(
         "-v",
-        type=int,
+        "--versions",
+        action="store_true",
         help="Download different versions apps",
     )
     parser.add_argument(
@@ -112,7 +113,6 @@ def main():
             "package_name": app.docid,
             "title": app.title,
             "creator": app.creator,
-            "versioncode": app.docV2.details.appDetails.versionCode,
         }
 
         if args.out.strip(" '\"") == downloaded_apk_default_location:
@@ -123,7 +123,6 @@ def main():
                 re.sub(
                     r"[^\w\-_.\s]",
                     "_",
-                    f"{details['title']} by {details['creator']} - "
                     f"{details['package_name']}.apk",
                 ),
             )
@@ -148,6 +147,7 @@ def main():
         success = api.download(
             details["package_name"],
             downloaded_apk_file_path,
+            download_versions=True if args.versions else False,
             download_obb=True if args.blobs else False,
             download_split_apks=True if args.split_apks else False,
         )
