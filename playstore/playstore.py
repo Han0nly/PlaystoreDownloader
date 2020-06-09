@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import re
+import time
 from typing import Iterable
 
 import requests
@@ -305,6 +306,7 @@ class Playstore(object):
         path = "delivery"
         if download_versions:
             for i in range(0,version_code):
+                time.sleep(1)
                 if i > 50000:
                     break
                 if not file_name:
