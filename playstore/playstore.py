@@ -323,6 +323,9 @@ class Playstore(object):
                 query = {"ot": offer_type, "doc": package_name, "vc": i}
                 response = self._execute_request(path, query)
                 if "payload" not in self.protobuf_to_dict(response):
+                    self.logger.error(
+                        f"Error for app '{package_name}': " f"{response.commands.displayErrorMessage}"
+                    )
                     continue
                 delivery_data = response.payload.deliveryResponse.appDeliveryData
                 if not delivery_data.downloadUrl:
@@ -331,6 +334,9 @@ class Playstore(object):
                     path = "purchase"
                     response = self._execute_request(path, data=query)
                     if "payload" not in self.protobuf_to_dict(response):
+                        self.logger.error(
+                            f"Error for app '{package_name}': " f"{response.commands.displayErrorMessage}"
+                        )
                         continue
                     delivery_data = (
                         response.payload.buyResponse.purchaseStatusResponse.appDeliveryData
@@ -342,6 +348,9 @@ class Playstore(object):
                         query["dtok"] = download_token
                         response = self._execute_request(path, query)
                         if "payload" not in self.protobuf_to_dict(response):
+                            self.logger.error(
+                                f"Error for app '{package_name}': " f"{response.commands.displayErrorMessage}"
+                            )
                             continue
                         delivery_data = response.payload.deliveryResponse.appDeliveryData
 
