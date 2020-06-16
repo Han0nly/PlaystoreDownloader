@@ -305,12 +305,12 @@ class Playstore(object):
         offer_type = details.docV2.offer[0].offerType
         # Check if the app was already downloaded by this account.
         path = "delivery"
-        self.logger.log(
+        self.logger.info(
             f"最新版本为 '{version_code}'"
         )
         if download_versions:
             for i in range(0,version_code+1):
-                self.logger.debug(
+                self.logger.info(
                     f"正在下载'{package_name}_{i}'"
                 )
                 time.sleep(1)
@@ -321,9 +321,9 @@ class Playstore(object):
                 response = self._execute_request(path, query)
                 if "payload" not in self.protobuf_to_dict(response):
                     self.logger.error(
-                        f"Error for app '{package_name}' when version_code = '{i}': " f"{response.commands.displayErrorMessage}"
+                        f"After payload Error for app '{package_name}' when version_code = '{i}': " f"{response.commands.displayErrorMessage}"
                     )
-                    continue
+                    break
                 delivery_data = response.payload.deliveryResponse.appDeliveryData
                 if not delivery_data.downloadUrl:
                     # The app doesn't belong to the account, so it has to be added to the
@@ -332,7 +332,7 @@ class Playstore(object):
                     response = self._execute_request(path, data=query)
                     if "payload" not in self.protobuf_to_dict(response):
                         self.logger.error(
-                            f"Error for app '{package_name}' when version_code = '{i}': " f"{response.commands.displayErrorMessage}"
+                            f"After purchase Error for app '{package_name}' when version_code = '{i}': " f"{response.commands.displayErrorMessage}"
                         )
                         continue
                     delivery_data = (
@@ -346,7 +346,7 @@ class Playstore(object):
                         response = self._execute_request(path, query)
                         if "payload" not in self.protobuf_to_dict(response):
                             self.logger.error(
-                                f"Error for app '{package_name}' when version_code = '{i}': " f"{response.commands.displayErrorMessage}"
+                                f"After delivery Error for app '{package_name}' when version_code = '{i}': " f"{response.commands.displayErrorMessage}"
                             )
                             continue
                         delivery_data = response.payload.deliveryResponse.appDeliveryData
