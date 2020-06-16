@@ -305,26 +305,23 @@ class Playstore(object):
         offer_type = details.docV2.offer[0].offerType
         # Check if the app was already downloaded by this account.
         path = "delivery"
-        self.logger.error(
+        self.logger.log(
             f"最新版本为 '{version_code}'"
         )
         if download_versions:
             for i in range(0,version_code+1):
-                self.logger.error(
+                self.logger.debug(
                     f"正在下载'{package_name}_{i}'"
                 )
                 time.sleep(1)
                 if i > 50000:
                     break
-                if not file_name:
-                    file_name = f"{package_name}_{str(version_code)}.apk"
-                else:
-                    file_name = file_name[:-4]+f"_{str(version_code)}.apk"
+                file_name = f"./Downloads/{package_name}_{str(i)}.apk"
                 query = {"ot": offer_type, "doc": package_name, "vc": i}
                 response = self._execute_request(path, query)
                 if "payload" not in self.protobuf_to_dict(response):
                     self.logger.error(
-                        f"Error for app '{package_name}': " f"{response.commands.displayErrorMessage}"
+                        f"Error for app '{package_name}' when version_code = '{i}': " f"{response.commands.displayErrorMessage}"
                     )
                     continue
                 delivery_data = response.payload.deliveryResponse.appDeliveryData
@@ -335,7 +332,7 @@ class Playstore(object):
                     response = self._execute_request(path, data=query)
                     if "payload" not in self.protobuf_to_dict(response):
                         self.logger.error(
-                            f"Error for app '{package_name}': " f"{response.commands.displayErrorMessage}"
+                            f"Error for app '{package_name}' when version_code = '{i}': " f"{response.commands.displayErrorMessage}"
                         )
                         continue
                     delivery_data = (
@@ -349,7 +346,7 @@ class Playstore(object):
                         response = self._execute_request(path, query)
                         if "payload" not in self.protobuf_to_dict(response):
                             self.logger.error(
-                                f"Error for app '{package_name}': " f"{response.commands.displayErrorMessage}"
+                                f"Error for app '{package_name}' when version_code = '{i}': " f"{response.commands.displayErrorMessage}"
                             )
                             continue
                         delivery_data = response.payload.deliveryResponse.appDeliveryData
@@ -371,7 +368,8 @@ class Playstore(object):
                     cookie = delivery_data.downloadAuthCookie[0]
                 except IndexError:
                     self.logger.error(
-                        f"DownloadAuthCookie was not received for '{package_name}'"
+                        f"DownloadAuthCookie was not received for '{package_name}' when version_code = '{i}'"
+
                     )
                     continue
 
