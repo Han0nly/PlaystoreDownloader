@@ -309,6 +309,10 @@ class Playstore(object):
         self.logger.info(
             f"最新版本为 '{version_code}'"
         )
+        if version_code==0:
+            raise RuntimeError(
+                f"Not compatible for this device:'{package_name}'"
+            )
         if download_versions:
             for i in range(0,version_code+1):
                 self.logger.info(
