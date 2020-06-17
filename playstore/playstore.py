@@ -314,7 +314,7 @@ class Playstore(object):
                 self.logger.info(
                     f"正在下载'{package_name}_{i}'"
                 )
-                time.sleep(random.uniform(0.8,3.0))
+                time.sleep(random.uniform(1.5,4.0))
                 if i > 50000:
                     break
                 file_name = f"./Downloads/{package_name}_{str(i)}.apk"
@@ -324,7 +324,9 @@ class Playstore(object):
                     self.logger.error(
                         f"After payload Error for app '{package_name}' when version_code = '{i}': " f"{response.commands.displayErrorMessage}"
                     )
-                    break
+                    raise RuntimeError(
+                    f"Serverbusy/Error'{package_name}'_'{i}'"
+                    )
                 delivery_data = response.payload.deliveryResponse.appDeliveryData
                 if not delivery_data.downloadUrl:
                     # The app doesn't belong to the account, so it has to be added to the
