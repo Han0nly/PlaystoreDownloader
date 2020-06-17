@@ -5,6 +5,7 @@ import logging
 import os
 import re
 import time
+import random
 from typing import Iterable
 
 import requests
@@ -313,7 +314,7 @@ class Playstore(object):
                 self.logger.info(
                     f"正在下载'{package_name}_{i}'"
                 )
-                time.sleep(1)
+                time.sleep(random.uniform(0.8,3.0))
                 if i > 50000:
                     break
                 file_name = f"./Downloads/{package_name}_{str(i)}.apk"
